@@ -530,16 +530,29 @@ const _savedState = (() => {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const saved = JSON.parse(raw)
+    // Validate basic shape
+    if (!saved.structure || !Array.isArray(saved.structure) || saved.structure.length === 0) return null
+    if (saved.currentIndex >= saved.structure.length) return null
+    // Reject corrupted state with blinds beyond max poker blind
+    const maxBlind = POKER_BLINDS[POKER_BLINDS.length - 1]
+    const current = saved.structure[saved.currentIndex]
+    if (current.type === 'level' && (current.small > maxBlind || current.big > maxBlind)) {
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
     // If the timer was running, subtract elapsed wall-clock time
     if (saved.isRunning && saved.savedAt) {
       const elapsed = Math.floor((Date.now() - saved.savedAt) / 1000)
       saved.secondsLeft = Math.max(0, saved.secondsLeft - elapsed)
     }
-    // If time ran out during refresh, advance to next level
-    if (saved.isRunning && saved.secondsLeft === 0 && saved.structure) {
+    // If time ran out during refresh, advance to next level (just one)
+    if (saved.isRunning && saved.secondsLeft === 0) {
       if (saved.currentIndex < saved.structure.length - 1) {
         saved.currentIndex += 1
         saved.secondsLeft = saved.structure[saved.currentIndex].duration
+      } else {
+        // At end of structure, just pause
+        saved.isRunning = false
       }
     }
     return saved
@@ -568,10 +581,13 @@ function App() {
   const generateNextLevel = useCallback(() => {
     const lastLevel = [...structure].reverse().find(i => i.type === 'level')
     if (!lastLevel) return null
+    const maxBlind = POKER_BLINDS[POKER_BLINDS.length - 1]
+    // Stop generating if we've hit the ceiling
+    if (lastLevel.big >= maxBlind) return null
     return {
       type: 'level',
-      small: lastLevel.big,
-      big: lastLevel.big * 2,
+      small: roundBlind(lastLevel.big),
+      big: roundBlind(lastLevel.big * 2),
       ante: lastLevel.ante > 0 ? roundBlind(lastLevel.ante * 1.5) : 0,
       duration: lastLevel.duration,
     }
@@ -586,11 +602,18 @@ function App() {
 
   const nextLevel = getNextLevel()
 
+  const resetTimerRefs = useCallback((secs) => {
+    timerStartRef.current = Date.now()
+    timerBaseRef.current = secs
+  }, [])
+
   const advanceLevel = useCallback(() => {
     if (currentIndex < structure.length - 1) {
       const next = currentIndex + 1
+      const dur = structure[next].duration
       setCurrentIndex(next)
-      setSecondsLeft(structure[next].duration)
+      setSecondsLeft(dur)
+      resetTimerRefs(dur)
       if (soundOn) try { playBeep() } catch { /* audio may not be available */ }
     } else {
       const newLevel = generateNextLevel()
@@ -599,10 +622,11 @@ function App() {
         setStructure(updated)
         setCurrentIndex(updated.length - 1)
         setSecondsLeft(newLevel.duration)
+        resetTimerRefs(newLevel.duration)
         if (soundOn) try { playBeep() } catch { /* audio may not be available */ }
       }
     }
-  }, [currentIndex, structure, soundOn, generateNextLevel])
+  }, [currentIndex, structure, soundOn, generateNextLevel, resetTimerRefs])
 
   // Persist state to localStorage (throttled to once per second)
   const saveTimerRef = useRef(null)
@@ -681,6 +705,7 @@ function App() {
   const handleTimeEditConfirm = () => {
     const secs = parseDuration(editTime)
     setSecondsLeft(secs)
+    resetTimerRefs(secs)
     setShowTimeEdit(false)
     if (wasRunningRef.current) {
       setIsRunning(true)
@@ -697,8 +722,10 @@ function App() {
   const prevLevel = () => {
     if (currentIndex > 0) {
       const prev = currentIndex - 1
+      const dur = structure[prev].duration
       setCurrentIndex(prev)
-      setSecondsLeft(structure[prev].duration)
+      setSecondsLeft(dur)
+      resetTimerRefs(dur)
     }
   }
 
@@ -712,6 +739,7 @@ function App() {
     setIsRunning(false)
     setCurrentIndex(currentIndex + 1)
     setSecondsLeft(1200)
+    resetTimerRefs(1200)
   }
 
   const handleSaveStructure = (newStructure) => {
@@ -719,6 +747,7 @@ function App() {
     setIsRunning(false)
     setCurrentIndex(0)
     setSecondsLeft(newStructure[0].duration)
+    resetTimerRefs(newStructure[0].duration)
     setShowEditor(false)
   }
 
