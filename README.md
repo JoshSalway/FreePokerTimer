@@ -1,16 +1,37 @@
-# React + Vite
+# Free Poker Timer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A free, open-source poker tournament blind timer built as a single-page application with React and Vite. Deployed on [Netlify](https://www.netlify.com/).
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Circular countdown timer with drift-free accuracy
+- Configurable blind structure with drag-and-drop reordering
+- Quick setup generator for common tournament formats
+- Ad-hoc break insertion that preserves and resumes level progress
+- Auto-advance through levels with optional sound alerts
+- Persists state to localStorage (survives page refresh)
+- Tap-to-edit remaining time
+- Keyboard shortcut: Space to play/pause
 
-## React Compiler
+## Development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev
+```
 
-## Expanding the ESLint configuration
+## Build
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run build
+```
+
+## Related Projects
+
+| Project | Description |
+|---------|-------------|
+| [FreePokerTimer](https://github.com/JoshSalway/FreePokerTimer) | This project — free Vite/React SPA timer |
+| [FreePokerTimer-Laravel](https://github.com/JoshSalway/FreePokerTimer-Laravel) | Laravel rebuild of the free timer (future replacement for this project) |
+| [PokerTimer](https://github.com/JoshSalway/PokerTimer) | Poker Timer Pro — the paid SaaS product with advanced features |
+
+The **FreePokerTimer-Laravel** project is a ground-up rewrite using Laravel and will eventually replace this Vite SPA. **PokerTimer** (Poker Timer Pro) is the commercial product offering premium features beyond what the free timer provides.
