@@ -22,6 +22,10 @@ const DEFAULT_STRUCTURE = [
 ]
 
 function fmt(n) {
+  if (n >= 1_000_000 && n % 1_000_000 === 0) return `${n / 1_000_000}M`
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (n >= 10_000 && n % 1_000 === 0) return `${n / 1_000}K`
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`
   return n.toLocaleString()
 }
 
