@@ -215,6 +215,9 @@ function BlindEditor({ structure, onSave, onClose }) {
   const [dragIndex, setDragIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const [showGenerator, setShowGenerator] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
   const [gen, setGen] = useState({
     startSmall: 100,
     bbMultiplier: 2,
@@ -239,6 +242,28 @@ function BlindEditor({ structure, onSave, onClose }) {
     })
     setItems(assignIds(result))
     setShowGenerator(false)
+  }
+
+  const generateWithAI = async () => {
+    if (!aiPrompt.trim()) return
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const res = await fetch('/.netlify/functions/generate-structure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate')
+      setItems(assignIds(data.structure))
+      setAiPrompt('')
+      setShowGenerator(false)
+    } catch (err) {
+      setAiError(err.message)
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   const updateItem = (index, field, value) => {
@@ -326,6 +351,25 @@ function BlindEditor({ structure, onSave, onClose }) {
 
           {showGenerator && (
             <div className="generator">
+              <div className="ai-generate">
+                <label className="ai-label">Describe your tournament</label>
+                <div className="ai-input-row">
+                  <input
+                    type="text"
+                    className="ai-input"
+                    placeholder="e.g. 3 hour tournament, 8 players, 10K chips, 15 min levels"
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && !aiLoading && generateWithAI()}
+                    disabled={aiLoading}
+                  />
+                  <button className="btn btn-ai" onClick={generateWithAI} disabled={aiLoading || !aiPrompt.trim()}>
+                    {aiLoading ? 'Generating...' : 'AI Generate'}
+                  </button>
+                </div>
+                {aiError && <div className="ai-error">{aiError}</div>}
+              </div>
+              <div className="ai-divider"><span>or configure manually</span></div>
               <div className="gen-grid">
                 <label>
                   <span>Starting Small Blind</span>
@@ -1059,7 +1103,7 @@ function App() {
                 </div>
                 <div className="faq-item">
                   <h3>Is this really free?</h3>
-                  <p>Yes, completely free with no ads. For advanced features check out <strong>Poker Timer Pro</strong>.</p>
+                  <p>Yes, completely free with no ads.</p>
                 </div>
               </div>
             </div>
