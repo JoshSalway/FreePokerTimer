@@ -31,12 +31,6 @@ function formatTime(totalSeconds) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-function formatDuration(seconds) {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
 function parseDuration(str) {
   const trimmed = String(str).trim()
   if (!trimmed) return 600
@@ -54,12 +48,12 @@ function parseDuration(str) {
 }
 
 function DurationInput({ value, onChange, className }) {
-  const [text, setText] = useState(formatDuration(value))
+  const [text, setText] = useState(formatTime(value))
   const [lastValue, setLastValue] = useState(value)
   const [isFocused, setIsFocused] = useState(false)
 
   if (value !== lastValue && !isFocused) {
-    setText(formatDuration(value))
+    setText(formatTime(value))
     setLastValue(value)
   }
 
@@ -67,7 +61,7 @@ function DurationInput({ value, onChange, className }) {
     setIsFocused(false)
     const secs = parseDuration(text)
     onChange(secs)
-    setText(formatDuration(secs))
+    setText(formatTime(secs))
     setLastValue(secs)
   }
 
@@ -239,7 +233,7 @@ function BlindEditor({ structure, onSave, onClose }) {
       duration: gen.duration * 60,
       breakDuration: gen.breakDuration * 60,
     })
-    setItems(result)
+    setItems(assignIds(result))
     setShowGenerator(false)
   }
 
@@ -495,10 +489,9 @@ function BlindEditor({ structure, onSave, onClose }) {
                       />
                     </td>
                     <td>
-                      <input
-                        type="text"
-                        value={formatDuration(item.duration)}
-                        onChange={e => updateItem(i, 'duration', e.target.value)}
+                      <DurationInput
+                        value={item.duration}
+                        onChange={secs => { const u = [...items]; u[i].duration = secs; setItems(u) }}
                         className="editor-input duration-input"
                       />
                     </td>
@@ -568,6 +561,7 @@ function App() {
   const [isRunning, setIsRunning] = useState(_savedState?.isRunning ?? false)
   const [soundOn, setSoundOn] = useState(_savedState?.soundOn ?? false)
   const [showEditor, setShowEditor] = useState(false)
+  const [interruptedLevel, setInterruptedLevel] = useState(_savedState?.interruptedLevel ?? null)
   const [showTimeEdit, setShowTimeEdit] = useState(false)
   const [editTime, setEditTime] = useState('')
   const intervalRef = useRef(null)
@@ -607,7 +601,28 @@ function App() {
     timerBaseRef.current = secs
   }, [])
 
+  const resumeFromBreak = useCallback(() => {
+    if (!interruptedLevel) return
+    const { index, remainingTime } = interruptedLevel
+    // Remove the inserted break from structure
+    const updated = [...structure]
+    updated.splice(currentIndex, 1)
+    setStructure(updated)
+    // The interrupted level index may have shifted if break was before it
+    const resumeIndex = currentIndex <= index ? index - 1 : index
+    setCurrentIndex(resumeIndex)
+    setSecondsLeft(remainingTime)
+    resetTimerRefs(remainingTime)
+    setInterruptedLevel(null)
+    if (soundOn) try { playBeep() } catch { /* audio may not be available */ }
+  }, [interruptedLevel, structure, currentIndex, soundOn, resetTimerRefs])
+
   const advanceLevel = useCallback(() => {
+    // If ending a break that interrupted a level, resume that level
+    if (structure[currentIndex]?.type === 'break' && interruptedLevel) {
+      resumeFromBreak()
+      return
+    }
     if (currentIndex < structure.length - 1) {
       const next = currentIndex + 1
       const dur = structure[next].duration
@@ -626,7 +641,7 @@ function App() {
         if (soundOn) try { playBeep() } catch { /* audio may not be available */ }
       }
     }
-  }, [currentIndex, structure, soundOn, generateNextLevel, resetTimerRefs])
+  }, [currentIndex, structure, soundOn, generateNextLevel, resetTimerRefs, interruptedLevel, resumeFromBreak])
 
   // Persist state to localStorage (throttled to once per second)
   const saveTimerRef = useRef(null)
@@ -639,12 +654,13 @@ function App() {
         secondsLeft,
         isRunning,
         soundOn,
+        interruptedLevel,
         savedAt: Date.now(),
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     }, 1000)
     return () => clearTimeout(saveTimerRef.current)
-  }, [structure, currentIndex, secondsLeft, isRunning, soundOn])
+  }, [structure, currentIndex, secondsLeft, isRunning, soundOn, interruptedLevel])
 
   // Save immediately on beforeunload so we capture exact state on refresh
   useEffect(() => {
@@ -655,13 +671,14 @@ function App() {
         secondsLeft,
         isRunning,
         soundOn,
+        interruptedLevel,
         savedAt: Date.now(),
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
-  }, [structure, currentIndex, secondsLeft, isRunning, soundOn])
+  }, [structure, currentIndex, secondsLeft, isRunning, soundOn, interruptedLevel])
 
   // Track when timer starts for drift-free countdown
   useEffect(() => {
@@ -732,10 +749,16 @@ function App() {
   const skipLevel = () => advanceLevel()
 
   const takeBreak = () => {
+    // If already on a break, end it early
+    if (isBreak && interruptedLevel) {
+      resumeFromBreak()
+      return
+    }
     const breakItem = { type: 'break', duration: 1200 }
     const updated = [...structure]
     updated.splice(currentIndex + 1, 0, breakItem)
     setStructure(updated)
+    setInterruptedLevel({ index: currentIndex, remainingTime: secondsLeft })
     setIsRunning(false)
     setCurrentIndex(currentIndex + 1)
     setSecondsLeft(1200)
@@ -748,6 +771,7 @@ function App() {
     setCurrentIndex(0)
     setSecondsLeft(newStructure[0].duration)
     resetTimerRefs(newStructure[0].duration)
+    setInterruptedLevel(null)
     setShowEditor(false)
   }
 
@@ -938,7 +962,9 @@ function App() {
         <button className="btn" onClick={skipLevel}>
           Next &#9654;
         </button>
-        <button className="btn btn-break" onClick={takeBreak}>Break</button>
+        <button className="btn btn-break" onClick={takeBreak}>
+          {isBreak && interruptedLevel ? 'End Break' : 'Break'}
+        </button>
       </div>
 
       <footer>
