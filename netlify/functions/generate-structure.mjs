@@ -1,6 +1,46 @@
+import { getStore } from "@netlify/blobs";
+
+const RATE_LIMIT = 10;         // max requests per window
+const RATE_WINDOW_MS = 3600000; // 1 hour
+
+async function checkRateLimit(ip) {
+  const store = getStore("rate-limits");
+  const key = `rl:${ip}`;
+  const raw = await store.get(key);
+  const now = Date.now();
+
+  let record = raw ? JSON.parse(raw) : { count: 0, windowStart: now };
+
+  // Reset window if expired
+  if (now - record.windowStart > RATE_WINDOW_MS) {
+    record = { count: 0, windowStart: now };
+  }
+
+  if (record.count >= RATE_LIMIT) {
+    const resetIn = Math.ceil((record.windowStart + RATE_WINDOW_MS - now) / 60000);
+    return { allowed: false, resetIn };
+  }
+
+  record.count++;
+  await store.set(key, JSON.stringify(record));
+  return { allowed: true, remaining: RATE_LIMIT - record.count };
+}
+
 export default async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 })
+  }
+
+  // Rate limit by IP
+  const ip = req.headers.get('x-nf-client-connection-ip') || req.headers.get('x-forwarded-for') || 'unknown';
+  const rateCheck = await checkRateLimit(ip);
+  if (!rateCheck.allowed) {
+    return new Response(JSON.stringify({
+      error: `Rate limit reached. Try again in ${rateCheck.resetIn} minutes. Max ${RATE_LIMIT} generations per hour.`
+    }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 
   const { prompt } = await req.json()
@@ -85,7 +125,7 @@ Rules:
       }
     }
 
-    return new Response(JSON.stringify({ structure }), {
+    return new Response(JSON.stringify({ structure, remaining: rateCheck.remaining }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
