@@ -54,7 +54,7 @@
   left: 50%;
   width: 800px;
   height: 800px;
-  transform: translate(-50%, -55%);
+  transform: translate(-50%, -50%);
   background: radial-gradient(circle, var(--gold-glow) 0%, transparent 70%);
   pointer-events: none;
   transition: background 0.8s;
@@ -1142,23 +1142,21 @@ kbd {
 /* ===== RESPONSIVE: SMALL SCREENS ===== */
 @media (max-width: 700px) {
   .app {
-    padding: 1rem;
+    padding: 0.75rem;
+    padding-top: 3.5rem;
   }
 
   .timer-layout {
     flex-direction: column;
-    gap: 1.5rem;
-  }
-
-  .blinds-panel {
-    order: 2;
-  }
-
-  .center-panel {
-    order: 1;
+    gap: 0;
+    justify-content: center;
   }
 
   .left-panel {
+    order: 1;
+  }
+
+  .center-panel {
     order: 2;
   }
 
@@ -1166,22 +1164,72 @@ kbd {
     order: 3;
   }
 
+  .left-panel:not(.dimmed) {
+    background: none;
+    border: none;
+    padding: 0.5rem 0;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .blind-label {
+    font-size: 0.65rem;
+    margin-bottom: 0.15rem;
+  }
+
   .blind-big {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
+  }
+
+  .next-label {
+    font-size: 0.65rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .next-big {
+    font-size: 1.4rem;
+  }
+
+  .right-panel {
+    margin-top: -0.25rem;
   }
 
   .circle-timer {
-    width: 260px;
-    height: 260px;
+    width: min(70vw, 300px);
+    height: min(70vw, 300px);
+    margin: -1rem 0;
   }
 
   .circle-timer svg {
-    width: 260px;
-    height: 260px;
+    width: min(70vw, 300px);
+    height: min(70vw, 300px);
   }
 
   .time-display {
-    font-size: 3rem;
+    font-size: clamp(2.6rem, 11vw, 3.5rem);
+  }
+
+  .level-label {
+    font-size: 0.7rem;
+  }
+
+  .break-info {
+    font-size: 0.7rem;
+    margin-top: 0.25rem;
+  }
+
+  .controls {
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+  }
+
+  .btn {
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-play {
+    padding: 0.65rem 2rem;
   }
 
   .modal {
@@ -1194,24 +1242,16 @@ kbd {
     padding: 0.3rem;
   }
 
-  .controls {
-    gap: 0.4rem;
-  }
-
-  .btn {
-    padding: 0.55rem 1rem;
-    font-size: 0.85rem;
-  }
-
-  .btn-play {
-    padding: 0.65rem 2rem;
-  }
-
   .app-title {
     font-size: 0.7rem;
     letter-spacing: 2px;
-    top: 1rem;
-    left: 1rem;
+    top: 0.75rem;
+    left: 0.75rem;
+  }
+
+  .top-bar {
+    top: 0.75rem;
+    right: 0.75rem;
   }
 }
 
