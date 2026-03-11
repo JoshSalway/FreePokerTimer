@@ -215,6 +215,9 @@ function BlindEditor({ structure, onSave, onClose }) {
   const [dragIndex, setDragIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const [showGenerator, setShowGenerator] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
   const [gen, setGen] = useState({
     startSmall: 100,
     bbMultiplier: 2,
@@ -239,6 +242,28 @@ function BlindEditor({ structure, onSave, onClose }) {
     })
     setItems(assignIds(result))
     setShowGenerator(false)
+  }
+
+  const generateWithAI = async () => {
+    if (!aiPrompt.trim()) return
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const res = await fetch('/.netlify/functions/generate-structure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate')
+      setItems(assignIds(data.structure))
+      setAiPrompt('')
+      setShowGenerator(false)
+    } catch (err) {
+      setAiError(err.message)
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   const updateItem = (index, field, value) => {
@@ -326,6 +351,25 @@ function BlindEditor({ structure, onSave, onClose }) {
 
           {showGenerator && (
             <div className="generator">
+              <div className="ai-generate">
+                <label className="ai-label">Describe your tournament</label>
+                <div className="ai-input-row">
+                  <input
+                    type="text"
+                    className="ai-input"
+                    placeholder="e.g. 3 hour tournament, 8 players, 10K chips, 15 min levels"
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && !aiLoading && generateWithAI()}
+                    disabled={aiLoading}
+                  />
+                  <button className="btn btn-ai" onClick={generateWithAI} disabled={aiLoading || !aiPrompt.trim()}>
+                    {aiLoading ? 'Generating...' : 'AI Generate'}
+                  </button>
+                </div>
+                {aiError && <div className="ai-error">{aiError}</div>}
+              </div>
+              <div className="ai-divider"><span>or configure manually</span></div>
               <div className="gen-grid">
                 <label>
                   <span>Starting Small Blind</span>
@@ -568,6 +612,8 @@ function App() {
   const [interruptedLevel, setInterruptedLevel] = useState(_savedState?.interruptedLevel ?? null)
   const [showTimeEdit, setShowTimeEdit] = useState(false)
   const [editTime, setEditTime] = useState('')
+  const [showFaq, setShowFaq] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const intervalRef = useRef(null)
   const timerStartRef = useRef(null)
   const timerBaseRef = useRef(null)
@@ -781,15 +827,23 @@ function App() {
 
   useEffect(() => {
     const handleKey = (e) => {
-      if (showEditor) return
+      if (e.key === 'Escape') {
+        if (showFaq) { setShowFaq(false); return }
+        if (showShortcuts) { setShowShortcuts(false); return }
+        if (showEditor) return
+      }
+      if (showEditor || showFaq || showShortcuts) return
       if (e.code === 'Space') {
         e.preventDefault()
         setIsRunning(r => !r)
       }
+      if (e.key === '?') {
+        setShowShortcuts(true)
+      }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [showEditor])
+  }, [showEditor, showFaq, showShortcuts])
 
   const isBreak = current.type === 'break'
 
@@ -851,6 +905,19 @@ function App() {
               <line x1="17" y1="9" x2="23" y2="15" />
             </svg>
           )}
+        </button>
+        <button className="icon-btn" onClick={() => setShowShortcuts(true)} title="Keyboard Shortcuts">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
+            <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M6 16h12" />
+          </svg>
+        </button>
+        <button className="icon-btn" onClick={() => setShowFaq(true)} title="FAQ">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
         </button>
         <button className="icon-btn" onClick={() => setShowEditor(true)} title="Settings">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -971,10 +1038,6 @@ function App() {
         </button>
       </div>
 
-      <footer>
-        <p>Press <kbd>Space</kbd> to play/pause</p>
-      </footer>
-
       {/* Editor Modal */}
       {showEditor && (
         <BlindEditor
@@ -982,6 +1045,70 @@ function App() {
           onSave={handleSaveStructure}
           onClose={() => setShowEditor(false)}
         />
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcuts && (
+        <div className="modal-overlay" onClick={() => setShowShortcuts(false)}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Keyboard Shortcuts</h2>
+              <button className="modal-close" onClick={() => setShowShortcuts(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="shortcuts-list">
+                <div className="shortcut-row"><kbd>Space</kbd><span>Play / Pause</span></div>
+                <div className="shortcut-row"><kbd>?</kbd><span>Show keyboard shortcuts</span></div>
+                <div className="shortcut-row"><kbd>Esc</kbd><span>Close any open panel</span></div>
+              </div>
+              <div className="shortcut-hint">Click the timer to edit remaining time</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FAQ Modal */}
+      {showFaq && (
+        <div className="modal-overlay" onClick={() => setShowFaq(false)}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>FAQ</h2>
+              <button className="modal-close" onClick={() => setShowFaq(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="faq-list">
+                <div className="faq-item">
+                  <h3>How do I start the timer?</h3>
+                  <p>Press the Play button or hit Space on your keyboard.</p>
+                </div>
+                <div className="faq-item">
+                  <h3>How do I edit the remaining time?</h3>
+                  <p>Click directly on the timer display in the circle. Type a new time (e.g. &ldquo;10:30&rdquo; or just &ldquo;10&rdquo; for 10 minutes) and press Enter.</p>
+                </div>
+                <div className="faq-item">
+                  <h3>How do breaks work?</h3>
+                  <p>Press Break to pause the current level and start a 20-minute break. Your remaining level time is saved. Press End Break or let it expire to resume where you left off.</p>
+                </div>
+                <div className="faq-item">
+                  <h3>How do I customize the blind structure?</h3>
+                  <p>Click the gear icon in the top right. You can manually edit each level, drag to reorder, or use Quick Setup to generate a structure automatically.</p>
+                </div>
+                <div className="faq-item">
+                  <h3>Does the timer save my progress?</h3>
+                  <p>Yes. The timer auto-saves to your browser. If you refresh or close the tab, it will resume where you left off, accounting for elapsed time.</p>
+                </div>
+                <div className="faq-item">
+                  <h3>What happens when I run out of levels?</h3>
+                  <p>The timer automatically generates the next level by doubling the previous big blind, up to the maximum poker blind value.</p>
+                </div>
+                <div className="faq-item">
+                  <h3>Is this really free?</h3>
+                  <p>Yes, completely free with no ads.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
