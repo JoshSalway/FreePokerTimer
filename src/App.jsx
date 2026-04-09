@@ -296,6 +296,9 @@ function BlindEditor({ structure, onSave, onClose }) {
     setItems([...items, { _id: nextItemId++, type: 'break', duration: 600 }])
   }
 
+  const resetToDefault = () => {
+    setItems(assignIds(JSON.parse(JSON.stringify(DEFAULT_STRUCTURE))))
+  }
 
   const handleDragStart = (e, index) => {
     setDragIndex(index)
@@ -556,6 +559,7 @@ function BlindEditor({ structure, onSave, onClose }) {
           <div className="add-buttons">
             <button className="btn btn-add" onClick={addLevel}>+ Add New Level</button>
             <button className="btn btn-add" onClick={addBreak}>+ Add Break</button>
+            <button className="btn btn-reset" onClick={resetToDefault}>Reset to Default</button>
           </div>
           <button className="btn btn-save" onClick={() => onSave(items)}>Save</button>
         </div>

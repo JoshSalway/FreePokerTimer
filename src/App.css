@@ -895,6 +895,21 @@ kbd {
   background: rgba(212, 168, 83, 0.04);
 }
 
+.btn-reset {
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid rgba(180, 80, 80, 0.3);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-reset:hover {
+  border-color: #c05050;
+  color: #e06060;
+  background: rgba(180, 80, 80, 0.08);
+}
+
 .btn-save {
   padding: 0.55rem 2rem;
   background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
